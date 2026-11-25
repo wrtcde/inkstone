@@ -129,7 +129,7 @@ authRoutes.post('/register', async (c) => {
   const rawUsername = typeof body.username === 'string' ? body.username.slice(0, 128) : ''
   const username = normalizeUsername(rawUsername)
   if (!USERNAME_PATTERN.test(username)) {
-    throw new ApiError(400, 'invalid_username', 'Username must contain 3-32 lowercase letters, numbers, underscores, or hyphens')
+    throw new ApiError(400, 'invalid_username', 'Username must contain 2-32 lowercase letters, numbers, underscores, or hyphens')
   }
   const weak = validateNewPassword(body.password)
   if (weak) throw new ApiError(400, 'weak_password', weak)
