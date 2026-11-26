@@ -13,6 +13,7 @@ import { LoadingBlock } from '../../components/feedback';
 import { Tooltip } from '../../components/overlay';
 import { useUi } from '../../store/ui';
 import { moveMarkdownTabFocus, selectMarkdownTab } from '../preview/markdown-tabs';
+import { Lightbox } from '../preview/Lightbox';
 import { t, useLocale } from "../../lib/i18n";
 
 export function SharePage({ slug }: {
@@ -163,6 +164,12 @@ export function SharePage({ slug }: {
             toggleCodeBlockCollapse(collapseButton);
             return;
         }
+        const image = target.closest<HTMLImageElement>('img');
+        if (image?.src) {
+            event.preventDefault();
+            useUi.getState().setLightbox({ src: image.src, alt: image.alt });
+            return;
+        }
         const tabButton = target.closest<HTMLButtonElement>('[data-tab-button]');
         if (tabButton) {
             event.preventDefault();
@@ -249,6 +256,7 @@ export function SharePage({ slug }: {
             </footer>
           </article>) : null}
       </main>
+      <Lightbox/>
     </div>);
 }
 function addShareAccess(html: string, slug: string): string {

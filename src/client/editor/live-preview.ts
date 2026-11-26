@@ -42,6 +42,15 @@ class RenderedBlock extends WidgetType {
             if (alive) view.requestMeasure();
         };
         void prepare().catch(() => { if (alive) view.requestMeasure(); });
+        host.addEventListener('mousedown', (event) => {
+            // Keep the widget alive for image clicks: CodeMirror would otherwise
+            // move the cursor on mousedown and replace the block with source
+            // before the click (lightbox) handler runs.
+            if ((event.target as HTMLElement).closest('img')) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
         host.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
             const checkbox = target.closest<HTMLInputElement>('input[data-task-line]');
@@ -81,6 +90,12 @@ class RenderedBlock extends WidgetType {
                 return;
             }
             if ((event.metaKey || event.ctrlKey) && target.closest('a[href]')) return;
+            const image = target.closest<HTMLImageElement>('img');
+            if (image?.src) {
+                event.preventDefault();
+                useUi.getState().setLightbox({ src: image.src, alt: image.alt });
+                return;
+            }
             event.preventDefault();
             // Preserve the source line under the pointer, including rows inside tables/lists.
             const mapped = target.closest<HTMLElement>('[data-line]');
