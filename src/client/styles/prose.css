@@ -800,15 +800,18 @@
   max-width: min(320px, 100%);
   margin: 0.9em 0;
 }
-/* Consecutive thumbnails flow into rows (WeChat-favorites style grid). */
-[data-image-view='thumb'] .ink-prose img:has(+ img),
-[data-image-view='thumb'] .ink-prose img:has(+ br + img),
-[data-image-view='thumb'] .ink-prose img + img,
-[data-image-view='thumb'] .ink-prose img + br + img {
-  display: inline-block;
-  vertical-align: top;
-  max-width: 31%;
-  margin: 0 1% 0.8em 0;
+/* Consecutive thumbnails flow into a fixed 3-column grid so every row
+   uses the full width (WeChat-favorites style). */
+[data-image-view='thumb'] .ink-prose p:has(> img ~ img):not(:has(> :not(img):not(br))) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+[data-image-view='thumb'] .ink-prose p:has(> img ~ img):not(:has(> :not(img):not(br))) > img {
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 [data-image-view='thumb'] .ink-prose br:has(+ img) {
   display: none;
