@@ -42,11 +42,21 @@ class RenderedBlock extends WidgetType {
             if (alive) view.requestMeasure();
         };
         void prepare().catch(() => { if (alive) view.requestMeasure(); });
+        const trailingImageBlank = (event: MouseEvent): boolean => {
+            const lineNo = Math.min(this.block.endLine, view.state.doc.lines);
+            const lineText = view.state.doc.line(lineNo).text;
+            if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(lineText)) return false;
+            if ((event.target as HTMLElement).closest('img')) return false;
+            const imgs = host.querySelectorAll('img');
+            const lastImg = imgs[imgs.length - 1];
+            if (!lastImg) return false;
+            return event.clientY > lastImg.getBoundingClientRect().bottom;
+        };
         host.addEventListener('mousedown', (event) => {
             // Keep the widget alive for image clicks: CodeMirror would otherwise
             // move the cursor on mousedown and replace the block with source
             // before the click (lightbox) handler runs.
-            if ((event.target as HTMLElement).closest('img')) {
+            if ((event.target as HTMLElement).closest('img') || trailingImageBlank(event)) {
                 event.preventDefault();
                 event.stopPropagation();
             }
@@ -94,6 +104,23 @@ class RenderedBlock extends WidgetType {
             if (image?.src) {
                 event.preventDefault();
                 useUi.getState().setLightbox({ src: image.src, alt: image.alt });
+                return;
+            }
+            if (trailingImageBlank(event)) {
+                // Clicking the blank space under a trailing image starts a new
+                // paragraph after it instead of exposing the image source.
+                event.preventDefault();
+                const lineNo = Math.min(this.block.endLine, view.state.doc.lines);
+                const line = view.state.doc.line(lineNo);
+                const next = lineNo < view.state.doc.lines ? view.state.doc.line(lineNo + 1) : null;
+                const at = next && next.text === '' ? next.to : line.to;
+                const insert = next && next.text === '' ? '\n' : '\n\n';
+                view.dispatch({
+                    changes: { from: at, insert },
+                    selection: { anchor: at + insert.length },
+                    userEvent: 'input',
+                });
+                view.focus();
                 return;
             }
             event.preventDefault();
@@ -180,6 +207,7 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
         parseTimer = 0;
         observer: MutationObserver;
         unsubscribe: () => void;
+        onScrollDOMMouseDown: (event: MouseEvent) => void;
         constructor(readonly view: EditorView) {
             const refreshView = () => {
                 window.clearTimeout(this.timer);
@@ -190,6 +218,26 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
             this.unsubscribe = useSession.subscribe((state, previous) => {
                 if (state.settings.preview !== previous.settings.preview || state.settings.appearance !== previous.settings.appearance) refreshView();
             });
+            this.onScrollDOMMouseDown = (event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest('.cm-live-block') || target.closest('.cm-content')) return;
+                const content = view.contentDOM.getBoundingClientRect();
+                if (event.clientY <= content.bottom || event.clientX < content.left || event.clientX > content.right) return;
+                const last = view.state.doc.line(view.state.doc.lines);
+                if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(last.text)) return;
+                // Blank space under a trailing image: start a new paragraph after
+                // it instead of putting the cursor inside the image block.
+                event.preventDefault();
+                event.stopPropagation();
+                const at = last.to;
+                view.dispatch({
+                    changes: { from: at, insert: '\n\n' },
+                    selection: { anchor: at + 2 },
+                    userEvent: 'input',
+                });
+                view.focus();
+            };
+            view.scrollDOM.addEventListener('mousedown', this.onScrollDOMMouseDown);
             queueMicrotask(() => { const value = view.state.field(field, false); if (value) onHeadings(value.headings); });
         }
         update(update: { docChanged: boolean; state: EditorState }) {
@@ -200,7 +248,7 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
             const headings = update.state.field(field).headings;
             queueMicrotask(() => { if (this.view.state.field(field, false)) onHeadings(headings); });
         }
-        destroy() { clearTimeout(this.timer); clearTimeout(this.parseTimer); this.observer.disconnect(); this.unsubscribe(); }
+        destroy() { clearTimeout(this.timer); clearTimeout(this.parseTimer); this.observer.disconnect(); this.unsubscribe(); this.view.scrollDOM.removeEventListener('mousedown', this.onScrollDOMMouseDown); }
     }), EditorView.domEventHandlers({
         focus(_event, view) { view.dispatch({ effects: focusChanged.of(true) }); },
         blur(_event, view) { view.dispatch({ effects: focusChanged.of(false) }); },
