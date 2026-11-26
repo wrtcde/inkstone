@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { EditorView } from '@codemirror/view';
 import { ArrowLeft, Columns2, Download, Eye, FileCode, FileDown, FileText, FolderClosed, Hash, History, Link as LinkIcon, ListTree, MoreHorizontal, PanelRightClose, Pencil, Plus, Share2, Star, X, } from 'lucide-react';
 import { cn } from '../../lib/cn';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import { readingMinutes } from '@shared/markdown-utils';
 import { LIMITS } from '@shared/constants';
 import type { EditorLayout } from '@shared/types';
@@ -199,7 +199,22 @@ export function Workspace({ onMobileBack, pane = 'active', grouped = false, }: {
         uploadFile: async (file: File) => {
             try {
                 const optimized = await optimizeImageFile(file);
-                const uploaded = await api.files.upload(optimized, note?.id);
+                // The server holds a per-account lease while finalizing an attachment;
+                // a concurrent upload gets 409. Back off and retry instead of failing.
+                let uploaded: Awaited<ReturnType<typeof api.files.upload>>;
+                for (let attempt = 0; ; attempt++) {
+                    try {
+                        uploaded = await api.files.upload(optimized, note?.id);
+                        break;
+                    }
+                    catch (err) {
+                        if (err instanceof ApiError && err.isConflict && attempt < 5) {
+                            await new Promise((resolve) => setTimeout(resolve, 800 * 2 ** attempt));
+                            continue;
+                        }
+                        throw err;
+                    }
+                }
                 return {
                     url: uploaded.url,
                     filename: uploaded.filename,

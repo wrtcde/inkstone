@@ -105,7 +105,9 @@ export async function insertFiles(view: EditorView, files: File[], handlers: Pas
         });
         return { file, placeholder };
     });
-    await Promise.all(pending.map(async ({ file, placeholder }) => {
+    // Sequential on purpose: the server finalizes one attachment per account at a
+    // time (quota lease); parallel uploads would 409 and mark files as failed.
+    for (const { file, placeholder } of pending) {
         let result: Awaited<ReturnType<PasteHandlers['uploadFile']>> = null;
         try {
             result = await handlers.uploadFile(file);
@@ -117,19 +119,19 @@ export async function insertFiles(view: EditorView, files: File[], handlers: Pas
             : t("editor.upload_failed_value0", { value0: safeHtmlComment(file.name) });
         if (!view.dom.isConnected) {
             handlers.replaceDetachedUpload?.(placeholder, markdown);
-            return;
+            continue;
         }
         const doc = view.state.doc.toString();
         const at = doc.indexOf(placeholder);
         if (at < 0) {
             handlers.replaceDetachedUpload?.(placeholder, markdown);
-            return;
+            continue;
         }
         view.dispatch({
             changes: { from: at, to: at + placeholder.length, insert: markdown },
             userEvent: 'input.paste',
         });
-    }));
+    }
 }
 export function uploadedFileMarkdown(result: {
     url: string;
