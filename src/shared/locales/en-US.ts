@@ -1096,6 +1096,8 @@ export const EN_US_MESSAGES = {
     "workspace.block_id": "Block ID",
     "workspace.paragraph": "Body text",
     "workspace.upload_image": "Upload image",
+    "workspace.image_view_full": "Full-size images",
+    "workspace.image_view_thumb": "Thumbnail images",
     "workspace.block_math": "Block formula",
     "workspace.front_matter": "Note properties (YAML)",
     "workspace.hidden_comment": "Hidden comment",

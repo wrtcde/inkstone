@@ -15,6 +15,7 @@ export interface NoteRow {
   is_pinned: number
   is_starred: number
   is_archived: number
+  image_view?: string
   position: number
   content_hash: string
   created_at: number
@@ -54,6 +55,7 @@ export function toNoteSummary(row: NoteRow): NoteSummary {
     isPinned: row.is_pinned === 1,
     isStarred: row.is_starred === 1,
     isArchived: row.is_archived === 1,
+    imageView: row.image_view === 'thumb' ? 'thumb' : 'full',
     wordCount: row.word_count,
     charCount: row.char_count,
     rev: row.rev,
@@ -119,7 +121,7 @@ export function splitTags(joined: string | null | undefined): string[] {
 
 
 export const NOTE_COLUMNS = `n.id, n.user_id, n.folder_id, n.title, n.excerpt, n.rev,
-  n.word_count, n.char_count, n.is_pinned, n.is_starred, n.is_archived, n.position,
+  n.word_count, n.char_count, n.is_pinned, n.is_starred, n.is_archived, n.image_view, n.position,
   n.content_hash, n.created_at, n.updated_at, n.deleted_at,
   (SELECT GROUP_CONCAT(t.name, char(1)) FROM note_tags nt
      JOIN tags t ON t.id = nt.tag_id

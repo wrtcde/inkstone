@@ -796,6 +796,10 @@
   cursor: zoom-in;
   background: var(--bg-inset);
 }
+[data-image-view='thumb'] .ink-prose img {
+  max-width: min(320px, 100%);
+  margin: 0.9em 0;
+}
 .ink-prose figure {
   margin: 1em 0;
 }

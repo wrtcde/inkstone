@@ -154,6 +154,7 @@ export interface NoteSummary {
   isPinned: boolean
   isStarred: boolean
   isArchived: boolean
+  imageView?: 'full' | 'thumb'
   wordCount: number
   charCount: number
   rev: number
@@ -268,6 +269,7 @@ export interface PatchNoteBody {
   isPinned?: boolean
   isStarred?: boolean
   isArchived?: boolean
+  imageView?: 'full' | 'thumb'
 
   quiet?: boolean
   preserveVersion?: boolean

@@ -47,7 +47,7 @@ interface NotesState {
         isStarred?: boolean;
         open?: boolean;
     }) => Promise<string | null>;
-    patchNote: (id: string, patch: Partial<Pick<NoteSummary, 'isPinned' | 'isStarred' | 'isArchived'>> & {
+    patchNote: (id: string, patch: Partial<Pick<NoteSummary, 'isPinned' | 'isStarred' | 'isArchived' | 'imageView'>> & {
         folderId?: string | null;
     }) => Promise<void>;
     deleteNote: (id: string) => Promise<void>;
@@ -100,7 +100,7 @@ const openSequences: Record<WorkspacePane, number> = { primary: 0, secondary: 0 
 const latestRequestedNoteIds: Record<WorkspacePane, string | null> = { primary: null, secondary: null };
 
 const noteWriteTails = new Map<string, Promise<void>>();
-type OptimisticNotePatch = Partial<Pick<NoteSummary, 'folderId' | 'isPinned' | 'isStarred' | 'isArchived' | 'deletedAt' | 'updatedAt'>>;
+type OptimisticNotePatch = Partial<Pick<NoteSummary, 'folderId' | 'isPinned' | 'isStarred' | 'isArchived' | 'imageView' | 'deletedAt' | 'updatedAt'>>;
 interface PendingNoteMutation {
     patch: OptimisticNotePatch;
     before: NoteSummary;
@@ -1545,7 +1545,7 @@ function availableLocalFolderName(folders: Folder[], parentId: string | null, ba
 }
 function compactOptimisticPatch(patch: OptimisticNotePatch): OptimisticNotePatch {
     const compact: OptimisticNotePatch = {};
-    for (const key of ['folderId', 'isPinned', 'isStarred', 'isArchived', 'deletedAt', 'updatedAt'] as const) {
+    for (const key of ['folderId', 'isPinned', 'isStarred', 'isArchived', 'imageView', 'deletedAt', 'updatedAt'] as const) {
         if (patch[key] !== undefined)
             Object.assign(compact, { [key]: patch[key] });
     }
@@ -1878,6 +1878,7 @@ function noteSummaryEqual(a: NoteSummary, b: NoteSummary): boolean {
         a.isPinned === b.isPinned &&
         a.isStarred === b.isStarred &&
         a.isArchived === b.isArchived &&
+        (a.imageView ?? 'full') === (b.imageView ?? 'full') &&
         a.wordCount === b.wordCount &&
         a.charCount === b.charCount &&
         a.rev === b.rev &&

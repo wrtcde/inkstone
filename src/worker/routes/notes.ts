@@ -424,6 +424,10 @@ notesRoutes.patch('/:id', async (c) => {
   if (typeof body.isPinned === 'boolean' && Number(body.isPinned) !== row.is_pinned) push(sets, binds, 'is_pinned', body.isPinned ? 1 : 0)
   if (typeof body.isStarred === 'boolean' && Number(body.isStarred) !== row.is_starred) push(sets, binds, 'is_starred', body.isStarred ? 1 : 0)
   if (typeof body.isArchived === 'boolean' && Number(body.isArchived) !== row.is_archived) push(sets, binds, 'is_archived', body.isArchived ? 1 : 0)
+  if (body.imageView !== undefined) {
+    if (body.imageView !== 'full' && body.imageView !== 'thumb') throw ApiError.badRequest('imageView must be full or thumb')
+    if (body.imageView !== (row.image_view === 'thumb' ? 'thumb' : 'full')) push(sets, binds, 'image_view', body.imageView)
+  }
 
   if (!sets.length) return c.json(toNote(row))
 
@@ -1144,6 +1148,9 @@ function applyPatchRow(
         break
       case 'is_archived':
         next.is_archived = value as number
+        break
+      case 'image_view':
+        next.image_view = value as string
         break
       case 'updated_at':
         next.updated_at = value as number

@@ -1097,6 +1097,8 @@ export const ZH_CN_MESSAGES = {
     "workspace.block_id": "块 ID",
     "workspace.paragraph": "正文",
     "workspace.upload_image": "上传图片",
+    "workspace.image_view_full": "大图模式",
+    "workspace.image_view_thumb": "小图模式",
     "workspace.block_math": "块级公式",
     "workspace.front_matter": "笔记属性（YAML）",
     "workspace.hidden_comment": "隐藏注释",

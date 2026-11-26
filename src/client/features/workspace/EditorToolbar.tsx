@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { EditorView } from '@codemirror/view';
-import { Blocks, Bold, Braces, ChevronDown, Code, FileText, Heading, Highlighter, Image as ImageIcon, Italic, Link2, List, ListOrdered, ListTodo, Quote, Search, Sigma, Strikethrough, Table } from 'lucide-react';
+import { Blocks, Bold, Braces, ChevronDown, Code, FileText, Heading, Highlighter, Image as ImageIcon, Italic, Link2, List, ListOrdered, ListTodo, Maximize2, Minimize2, Quote, Search, Sigma, Strikethrough, Table } from 'lucide-react';
 import { IconButton } from '../../components/primitives';
 import { Menu, Tooltip, type MenuItem } from '../../components/overlay';
 import { cn } from '../../lib/cn';
@@ -11,11 +11,13 @@ import { openFindPanel } from '../../editor/search';
 
 type ToolbarMenu = 'heading' | 'reference' | 'image' | 'note' | 'code' | 'math' | 'block';
 
-export function EditorToolbar({ runCommand, view, onPickImage, mobile = false }: {
+export function EditorToolbar({ runCommand, view, onPickImage, mobile = false, imageView, onToggleImageView }: {
     runCommand?: (command: (target: EditorView) => boolean) => void;
     view?: EditorView | null;
     onPickImage: () => void;
     mobile?: boolean;
+    imageView?: 'full' | 'thumb';
+    onToggleImageView?: () => void;
 }) {
     const headingRef = useRef<HTMLButtonElement>(null);
     const referenceRef = useRef<HTMLButtonElement>(null);
@@ -119,6 +121,9 @@ export function EditorToolbar({ runCommand, view, onPickImage, mobile = false }:
       <Divider />
       {menuButton('reference', <Link2 size={14}/>, { label: t('workspace.link'), combo: editorCombo('link'), onClick: run(insertLink()) })}
       {menuButton('image', <ImageIcon size={14}/>, { label: t('workspace.upload_image'), onClick: pickImage })}
+      {onToggleImageView && (<ToolButton label={t(imageView === 'thumb' ? 'workspace.image_view_full' : 'workspace.image_view_thumb')} onClick={onToggleImageView}>
+        {imageView === 'thumb' ? <Maximize2 size={14}/> : <Minimize2 size={14}/>}
+      </ToolButton>)}
       {menuButton('note', <FileText size={14}/>)}
       <Divider />
       {menuButton('code', <Braces size={14}/>, { label: t('workspace.code_block'), onClick: run(insertCodeBlock) })}

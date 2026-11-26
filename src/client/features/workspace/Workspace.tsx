@@ -508,9 +508,9 @@ export function Workspace({ onMobileBack, pane = 'active', grouped = false, }: {
         </div>
       </header>
 
-      {settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()}/>)}
+      {settings.editor.showToolbar && showEditor && (<EditorToolbar runCommand={runEditorCommand} mobile={isMobile} onPickImage={() => fileInputRef.current?.click()} imageView={note.imageView ?? 'full'} onToggleImageView={() => void patchNote(note.id, { imageView: note.imageView === 'thumb' ? 'full' : 'thumb' })}/>)}
 
-      <div ref={containerRef} className={cn("flex min-h-0 flex-1", isMobile && "flex-col")} data-editor-layout={layout}>
+      <div ref={containerRef} className={cn("flex min-h-0 flex-1", isMobile && "flex-col")} data-editor-layout={layout} data-image-view={note.imageView ?? 'full'}>
         <div hidden={!showEditor} inert={!showEditor} className="min-h-0 min-w-0" style={{ width: showSplit && !isMobile ? editorWidth : outlineVisible ? `calc(100% - ${OUTLINE_WIDTH}px)` : '100%', flex: isMobile ? 1 : undefined }}>
             <DeferredCodeEditor key={note.id} visible={showEditor} value={content} noteTitle={note.title} live={showEditor && layout === 'live' && livePreviewEnabled} onHeadings={setHeadings} onChange={onChange} settings={settings.editor} sources={sources} handlers={handlers} onReady={onEditorReady}/>
           </div>
