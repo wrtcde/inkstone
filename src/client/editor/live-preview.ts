@@ -42,21 +42,20 @@ class RenderedBlock extends WidgetType {
             if (alive) view.requestMeasure();
         };
         void prepare().catch(() => { if (alive) view.requestMeasure(); });
-        const trailingImageBlank = (event: MouseEvent): boolean => {
-            const lineNo = Math.min(this.block.endLine, view.state.doc.lines);
-            const lineText = view.state.doc.line(lineNo).text;
-            if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(lineText)) return false;
+        const imageBlockBlank = (event: MouseEvent): boolean => {
             if ((event.target as HTMLElement).closest('img')) return false;
-            const imgs = host.querySelectorAll('img');
-            const lastImg = imgs[imgs.length - 1];
-            if (!lastImg) return false;
-            return event.clientY > lastImg.getBoundingClientRect().bottom;
+            const from = this.block.startLine + 1;
+            const to = Math.min(this.block.endLine, view.state.doc.lines);
+            for (let n = from; n <= to; n++) {
+                if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(view.state.doc.line(n).text)) return false;
+            }
+            return host.querySelectorAll('img').length > 0;
         };
         host.addEventListener('mousedown', (event) => {
             // Keep the widget alive for image clicks: CodeMirror would otherwise
             // move the cursor on mousedown and replace the block with source
             // before the click (lightbox) handler runs.
-            if ((event.target as HTMLElement).closest('img') || trailingImageBlank(event)) {
+            if ((event.target as HTMLElement).closest('img') || imageBlockBlank(event)) {
                 event.preventDefault();
                 event.stopPropagation();
             }
@@ -106,9 +105,10 @@ class RenderedBlock extends WidgetType {
                 useUi.getState().setLightbox({ src: image.src, alt: image.alt });
                 return;
             }
-            if (trailingImageBlank(event)) {
-                // Clicking the blank space under a trailing image starts a new
-                // paragraph after it instead of exposing the image source.
+            if (imageBlockBlank(event)) {
+                // Clicking blank space in an image-only block (grid gaps, right
+                // of the last tile, below the grid) starts a new paragraph after
+                // it instead of exposing the image source.
                 event.preventDefault();
                 const lineNo = Math.min(this.block.endLine, view.state.doc.lines);
                 const line = view.state.doc.line(lineNo);
