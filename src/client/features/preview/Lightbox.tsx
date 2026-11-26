@@ -1,17 +1,41 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, ImageOff, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Download, ImageOff, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { IconButton } from '../../components/primitives';
 import { Tooltip, useDialogFocus, useEscape, useLockScroll } from '../../components/overlay';
 import { useUi } from '../../store/ui';
+import { useNotes } from '../../store/notes';
 import { t } from "../../lib/i18n";
 export function Lightbox() {
     const lightbox = useUi((s) => s.lightbox);
     const setLightbox = useUi((s) => s.setLightbox);
+    const contents = useNotes((s) => s.contents);
+    const lightboxPath = (() => {
+        if (!lightbox) return '';
+        try { return new URL(lightbox.src, location.href).pathname; } catch { return lightbox.src; }
+    })();
+    const canDelete = Boolean(lightboxPath) && Object.values(contents).some((c) => c && c.includes(lightboxPath));
     const panelRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
     const [failed, setFailed] = useState(false);
     const close = () => setLightbox(null);
+    const deleteImage = () => {
+        if (!lightbox) return;
+        let path = lightbox.src;
+        try { path = new URL(lightbox.src, location.href).pathname; } catch { /* keep raw */ }
+        const { contents, editContent } = useNotes.getState();
+        const entry = Object.entries(contents).find(([, content]) => content && content.includes(path));
+        if (entry) {
+            const [noteId, content] = entry;
+            const escaped = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const next = content
+                .replace(new RegExp('!\\[[^\\]]*\\]\\(<' + escaped + '>\\)|!\\[[^\\]]*\\]\\(' + escaped + '\\)', 'g'), '')
+                .replace(/\n{3,}/g, '\n\n');
+            editContent(noteId, next);
+            useUi.getState().toast({ title: t('preview.image_deleted') });
+        }
+        close();
+    };
     useEscape(Boolean(lightbox), close);
     useLockScroll(Boolean(lightbox));
     useDialogFocus(Boolean(lightbox), panelRef);
@@ -48,6 +72,11 @@ export function Lightbox() {
             <ZoomIn size={16}/>
           </IconButton>
         </Tooltip>
+        {canDelete && (<Tooltip label={t("preview.delete_image")} side="bottom">
+          <IconButton label={t("preview.delete_image")} disabled={failed} onClick={deleteImage} className="text-white/70 hover:bg-white/10 hover:text-white">
+            <Trash2 size={16}/>
+          </IconButton>
+        </Tooltip>)}
         <Tooltip label={t("preview.download_original_image")} side="bottom">
           <a href={lightbox.src} download target="_blank" rel="noreferrer" aria-label={t("preview.download_original_image")} className="inline-flex size-9 items-center justify-center rounded-[var(--r-md)] text-white/70 transition-colors hover:bg-white/10 hover:text-white md:size-7">
             <Download size={16}/>

@@ -493,6 +493,8 @@ export const ZH_CN_MESSAGES = {
     "preview.could_not_update_this_task": "无法更新这一项",
     "preview.created_title": "已创建「{title}」",
     "preview.download_original_image": "下载原图",
+    "preview.delete_image": "删除这张图片",
+    "preview.image_deleted": "图片已删除",
     "preview.image_preview": "图片预览",
     "preview.could_not_load_image": "无法加载这张图片",
     "preview.the_preview_is_updating_try_again_in_a_moment": "预览正在更新，请稍后再试",

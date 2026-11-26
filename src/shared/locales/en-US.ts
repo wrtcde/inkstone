@@ -492,6 +492,8 @@ export const EN_US_MESSAGES = {
     "preview.could_not_update_this_task": "Could not update this task",
     "preview.created_title": "Created “{title}”",
     "preview.download_original_image": "Download original image",
+    "preview.delete_image": "Delete this image",
+    "preview.image_deleted": "Image deleted",
     "preview.image_preview": "Image preview",
     "preview.could_not_load_image": "Could not load this image",
     "preview.the_preview_is_updating_try_again_in_a_moment": "The preview is updating. Try again in a moment",

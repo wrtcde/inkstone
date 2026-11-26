@@ -1,4 +1,4 @@
-import { StateEffect, StateField, type EditorState, type Extension, type Range } from '@codemirror/state';
+import { StateEffect, StateField, EditorState, type Extension, type Range } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { searchPanelOpen } from '@codemirror/search';
@@ -14,6 +14,18 @@ import { selectMarkdownTab, moveMarkdownTabFocus } from '../features/preview/mar
 
 const focusChanged = StateEffect.define<boolean>();
 const refresh = StateEffect.define<boolean>();
+
+// A line consisting solely of image references. Image-only blocks stay
+// graphical in the editing surface: their Markdown source is never exposed.
+const IMAGE_LINE_RE = /^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/;
+function isImageOnlyBlock(state: EditorState, block: MarkdownBlock): boolean {
+    const to = Math.min(block.endLine, state.doc.lines);
+    if (to < block.startLine + 1) return false;
+    for (let n = block.startLine + 1; n <= to; n++) {
+        if (!IMAGE_LINE_RE.test(state.doc.line(n).text)) return false;
+    }
+    return true;
+}
 
 class RenderedBlock extends WidgetType {
     constructor(readonly block: MarkdownBlock, readonly source: string, readonly revision: number, readonly title: string) { super(); }
@@ -47,7 +59,7 @@ class RenderedBlock extends WidgetType {
             const from = this.block.startLine + 1;
             const to = Math.min(this.block.endLine, view.state.doc.lines);
             for (let n = from; n <= to; n++) {
-                if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(view.state.doc.line(n).text)) return false;
+                if (!IMAGE_LINE_RE.test(view.state.doc.line(n).text)) return false;
             }
             return host.querySelectorAll('img').length > 0;
         };
@@ -161,7 +173,7 @@ function decorate(state: EditorState, live: LiveState, title: string): Decoratio
         if (block.startLine >= state.doc.lines || block.endLine <= block.startLine) continue;
         const from = state.doc.line(block.startLine + 1).from;
         const to = state.doc.line(Math.min(block.endLine, state.doc.lines)).to;
-        const active = state.selection.ranges.some((range) =>
+        const active = !isImageOnlyBlock(state, block) && state.selection.ranges.some((range) =>
             (live.focused || !range.empty) && range.from <= to && range.to >= from);
         if (active || from === to) continue;
         ranges.push(Decoration.replace({ block: true, widget: new RenderedBlock(block, source, live.revision, title) }).range(from, to));
@@ -202,7 +214,38 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
         },
         provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
     });
-    return [field, ViewPlugin.fromClass(class {
+    return [field, EditorView.inputHandler.of((view, from, to, text) => {
+        // Typing while the caret sits on an image-only line must not edit the
+        // image Markdown: redirect the input into a new paragraph after it.
+        if (from !== to || !text) return false;
+        const doc = view.state.doc;
+        const lineNo = doc.lineAt(from).number;
+        const line = doc.line(lineNo);
+        if (line.text === '' && ((lineNo > 1 && IMAGE_LINE_RE.test(doc.line(lineNo - 1).text)) || (lineNo < doc.lines && IMAGE_LINE_RE.test(doc.line(lineNo + 1).text)))) {
+            // Typing on a blank line adjacent to an image block must keep a
+            // blank line between them, else Markdown merges the paragraphs.
+            const prevImage = lineNo > 1 && IMAGE_LINE_RE.test(doc.line(lineNo - 1).text);
+            const insert = prevImage ? '\n' + text : text + '\n';
+            view.dispatch({
+                changes: { from: line.from, insert },
+                selection: { anchor: line.from + insert.length },
+                userEvent: 'input',
+            });
+            return true;
+        }
+        if (!IMAGE_LINE_RE.test(line.text)) return false;
+        let toLine = lineNo;
+        while (toLine < doc.lines && IMAGE_LINE_RE.test(doc.line(toLine + 1).text)) toLine++;
+        const next = toLine < doc.lines ? doc.line(toLine + 1) : null;
+        const at = next && next.text === '' ? next.to : doc.line(toLine).to;
+        const prefix = next && next.text === '' ? '\n' : '\n\n';
+        view.dispatch({
+            changes: { from: at, insert: prefix + text },
+            selection: { anchor: at + prefix.length + text.length },
+            userEvent: 'input',
+        });
+        return true;
+    }), ViewPlugin.fromClass(class {
         timer = 0;
         parseTimer = 0;
         observer: MutationObserver;
@@ -224,7 +267,7 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
                 const content = view.contentDOM.getBoundingClientRect();
                 if (event.clientY <= content.bottom || event.clientX < content.left || event.clientX > content.right) return;
                 const last = view.state.doc.line(view.state.doc.lines);
-                if (!/^(?:\s*!\[[^\]]*\]\([^)]*\))+\s*$/.test(last.text)) return;
+                if (!IMAGE_LINE_RE.test(last.text)) return;
                 // Blank space under a trailing image: start a new paragraph after
                 // it instead of putting the cursor inside the image block.
                 event.preventDefault();
@@ -240,10 +283,33 @@ export function livePreview(onHeadings: (headings: Heading[]) => void, getTitle:
             view.scrollDOM.addEventListener('mousedown', this.onScrollDOMMouseDown);
             queueMicrotask(() => { const value = view.state.field(field, false); if (value) onHeadings(value.headings); });
         }
-        update(update: { docChanged: boolean; state: EditorState }) {
+        update(update: { docChanged: boolean; selectionSet: boolean; state: EditorState; startState: EditorState }) {
             if (update.docChanged) {
                 clearTimeout(this.parseTimer);
                 this.parseTimer = window.setTimeout(() => this.view.dispatch({ effects: refresh.of(false) }), 90);
+            }
+            if (update.selectionSet && update.state.selection.main.empty) {
+                // Keep the caret out of image-only lines: hop over the whole
+                // image block so typing never lands inside image Markdown.
+                const doc = update.state.doc;
+                const head = update.state.selection.main.head;
+                const lineNo = doc.lineAt(head).number;
+                if (IMAGE_LINE_RE.test(doc.line(lineNo).text)) {
+                    let from = lineNo;
+                    let to = lineNo;
+                    while (from > 1 && IMAGE_LINE_RE.test(doc.line(from - 1).text)) from--;
+                    while (to < doc.lines && IMAGE_LINE_RE.test(doc.line(to + 1).text)) to++;
+                    const forward = head >= update.startState.selection.main.head;
+                    const anchor = forward
+                        ? (to < doc.lines ? doc.line(to + 1).from : doc.length)
+                        : (from > 1 ? doc.line(from - 1).to : 0);
+                    window.setTimeout(() => {
+                        const cur = this.view.state.selection.main;
+                        if (cur.empty && this.view.state.doc.lineAt(cur.head).number === lineNo) {
+                            this.view.dispatch({ selection: { anchor } });
+                        }
+                    }, 0);
+                }
             }
             const headings = update.state.field(field).headings;
             queueMicrotask(() => { if (this.view.state.field(field, false)) onHeadings(headings); });
